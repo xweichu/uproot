@@ -5,6 +5,7 @@
 import os.path
 import numpy
 import uproot.source.chunked
+import sys
 
 from CephFS import CephFS
 from FileObject import FileObject
@@ -13,11 +14,11 @@ class FileSource(uproot.source.chunked.ChunkedSource):
     # makes __doc__ attribute mutable before Python 3.3
     __metaclass__ = type.__new__(type, "type", (uproot.source.chunked.ChunkedSource.__metaclass__,), {})
 
-    defaults = {"chunkbytes": 8*1024, "limitbytes": 1024**2}
+    defaults = {"chunkbytes": 8*1024, "limitbytes": 1024**2, "parallel": 8*multiprocessing.cpu_count() if sys.version_info[0] > 2 else 1}
 
-    def __init__(self, path, *args, **kwds):
+    def __init__(self, path, auth=None, *args, **kwds):
         self._size = None
-        super(FileSource, self).__init__(os.path.expanduser(path), *args, **kwds)
+        super(FileSource, self).__init__(path, *args, **kwds)
         # Connect to Ceph File System
         self._fs = CephFS()
 
@@ -44,5 +45,8 @@ class FileSource(uproot.source.chunked.ChunkedSource):
         return numpy.frombuffer(self._source.read(self._chunkbytes), dtype=numpy.uint8)
 
     def dismiss(self):
-        if self._source is not None:
+        if self._source is not None or not self._source.closed:
             self._source.close()       # local file connections are *not shared* among threads
+    
+    def __del__(self):
+        self._fs.unmount()
