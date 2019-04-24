@@ -3,10 +3,11 @@
 # BSD 3-Clause License; see https://github.com/scikit-hep/uproot/blob/master/LICENSE
 
 import os.path
-
 import numpy
-
 import uproot.source.chunked
+
+from CephFS import CephFS
+from FileObject import FileObject
 
 class FileSource(uproot.source.chunked.ChunkedSource):
     # makes __doc__ attribute mutable before Python 3.3
@@ -17,6 +18,8 @@ class FileSource(uproot.source.chunked.ChunkedSource):
     def __init__(self, path, *args, **kwds):
         self._size = None
         super(FileSource, self).__init__(os.path.expanduser(path), *args, **kwds)
+        # Connect to Ceph File System
+        self._fs = CephFS()
 
     def size(self):
         if self._size is None:
@@ -33,7 +36,8 @@ class FileSource(uproot.source.chunked.ChunkedSource):
 
     def _open(self):
         if self._source is None or self._source.closed:
-            self._source = open(self.path, "rb")
+            # Create a CephFS FileObject
+            self._source = FileObject(self._fs, self.path, "r+")
 
     def _read(self, chunkindex):
         self._source.seek(chunkindex * self._chunkbytes)

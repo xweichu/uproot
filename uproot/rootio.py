@@ -22,11 +22,14 @@ from uproot.source.xrootd import XRootDSource
 from uproot.source.http import HTTPSource
 from uproot.source.cursor import Cursor
 
+# Add the FileSource 
+from uproot.source.file import FileSource
+
 import uproot_methods.classes
 
 ################################################################ high-level interface
 
-def open(path, localsource=MemmapSource.defaults, xrootdsource=XRootDSource.defaults, httpsource=HTTPSource.defaults, **options):
+def open(path, localsource=MemmapSource.defaults, xrootdsource=XRootDSource.defaults, httpsource=HTTPSource.defaults, filesource=FileSource.defaults, **options):
     if isinstance(path, getattr(os, "PathLike", ())):
         path = os.fspath(path)
     elif hasattr(path, "__fspath__"):
@@ -40,12 +43,13 @@ def open(path, localsource=MemmapSource.defaults, xrootdsource=XRootDSource.defa
     if _bytesid(parsed.scheme) == b"file" or len(parsed.scheme) == 0 or (os.name == "nt" and open._windows_absolute.match(path) is not None):
         path = parsed.netloc + parsed.path
         if isinstance(localsource, dict):
-            kwargs = dict(MemmapSource.defaults)
-            kwargs.update(localsource)
-            openfcn = lambda path: MemmapSource(path, **kwargs)
-        else:
-            openfcn = localsource
-        return ROOTDirectory.read(openfcn(path), **options)
+            return file(path, filesource)
+        #     kwargs = dict(MemmapSource.defaults)
+        #     kwargs.update(localsource)
+        #     openfcn = lambda path: MemmapSource(path, **kwargs)
+        # else:
+        #     openfcn = localsource
+        # return ROOTDirectory.read(openfcn(path), **options)
 
     elif _bytesid(parsed.scheme) == b"root":
         return xrootd(path, xrootdsource)
@@ -74,6 +78,15 @@ def http(path, httpsource=HTTPSource.defaults, **options):
         openfcn = lambda path: HTTPSource(path, **kwargs)
     else:
         openfcn = httpsource
+    return ROOTDirectory.read(openfcn(path), **options)
+
+def file(path, filesource=FileSource.defaults, **options):
+    if isinstance(filesource, dict):
+        kwargs = dict(FileSource.defaults)
+        kwargs.update(filesource)
+        openfcn = lambda path: FileSource(path, **kwargs)
+    else:
+        openfcn = filesource
     return ROOTDirectory.read(openfcn(path), **options)
 
 def nofilter(x): return True
